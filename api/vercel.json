@@ -1,7 +1,0 @@
-{
-  "functions": {
-    "api/webhook-proxy.js": {
-      "maxDuration": 10
-    }
-  }
-}
