@@ -1,6 +1,0 @@
-{
-  "name": "webhook-proxy",
-  "version": "1.0.0",
-  "description": "Proxy for webhook.site data with CORS support",
-  "main": "api/webhook-proxy.js"
-}
