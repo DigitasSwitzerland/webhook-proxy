@@ -1,3 +1,10 @@
+// Simple in-memory storage for the latest webhook data
+let latestWebhookData = {
+  total_number_of_drives: 198385,
+  last_updated: new Date().toISOString(),
+  status: "waiting_for_data"
+};
+
 export default async function handler(req, res) {
   // Add CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -9,58 +16,55 @@ export default async function handler(req, res) {
     return;
   }
   
-  try {
-    // Try to get the latest request from webhook.site
-    const webhookUrl = 'https://webhook.site/token/c6daea10-b915-4f67-b786-b02b985e6573/requests';
-    
-    const response = await fetch(webhookUrl, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (compatible; WebhookProxy/1.0)',
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    // Get the latest request from webhook.site
-    const latestRequest = data.data && data.data.length > 0 ? data.data[0] : null;
-    
-    if (latestRequest && latestRequest.content) {
-      // Parse the JSON content from the latest webhook request
-      const webhookData = JSON.parse(latestRequest.content);
+  // Handle POST requests (incoming webhook data)
+  if (req.method === 'POST') {
+    try {
+      const webhookData = req.body;
       
-      // Return the data in the expected format
-      res.status(200).json({
-        timestamp: Date.now(),
+      // Store the latest data
+      latestWebhookData = {
         total_number_of_drives: webhookData.total_number_of_drives || 0,
-        last_updated: latestRequest.created_at || new Date().toISOString(),
-        status: "live_data"
+        last_updated: new Date().toISOString(),
+        status: "live_data",
+        received_at: new Date().toISOString()
+      };
+      
+      console.log('Received webhook data:', latestWebhookData);
+      
+      // Respond to the webhook sender
+      res.status(200).json({ 
+        message: 'Webhook received successfully',
+        timestamp: Date.now()
       });
-    } else {
-      // No recent data found
+      
+    } catch (error) {
+      console.error('Error processing webhook:', error);
+      res.status(500).json({ error: 'Failed to process webhook data' });
+    }
+  }
+  
+  // Handle GET requests (serve data to Webflow)
+  else if (req.method === 'GET') {
+    try {
+      // Return the latest stored data
       res.status(200).json({
         timestamp: Date.now(),
-        total_number_of_drives: 198385, // fallback
-        last_updated: new Date().toISOString(),
-        status: "no_recent_data"
+        total_number_of_drives: latestWebhookData.total_number_of_drives,
+        last_updated: latestWebhookData.last_updated,
+        status: latestWebhookData.status
+      });
+      
+    } catch (error) {
+      console.error('Error serving data:', error);
+      res.status(500).json({ 
+        error: 'Failed to serve webhook data',
+        details: error.message 
       });
     }
-    
-  } catch (error) {
-    console.error('Webhook proxy error:', error);
-    
-    // Return fallback data if the real source fails
-    res.status(200).json({
-      timestamp: Date.now(),
-      total_number_of_drives: 198385, // fallback number
-      last_updated: new Date().toISOString(),
-      status: "fallback_data",
-      error: error.message
-    });
+  }
+  
+  // Handle other methods
+  else {
+    res.status(405).json({ error: 'Method not allowed' });
   }
 }
